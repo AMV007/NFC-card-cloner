@@ -40,6 +40,7 @@ EOF
 # VARIABLES
 #----------------------------------------
 SAVE_CARD_DUMP_FILES_HERE="./card_data"
+RESTORE_CARD_FILE=${1}
 #----------------------------------------
 # PRE:
 #----------------------------------------
@@ -96,54 +97,62 @@ function detect_card_reader() {
 #----------------------------------------
 # MAIN
 #----------------------------------------
-printf " %-55s" "Detecting card reader.."
+printf " %-55s" "Detecting card reader, pls wait some seconds.."
 detect_card_reader
 echo "[OK]"
 #
-READ_CARD_LOOP=1
-while [ ${READ_CARD_LOOP} -eq 1 ]; do
- printf " %-55s" "Place the card to clone on the reader now.."
- read_uid_success="FALSE"
- while [ "${read_uid_success}" == "FALSE" ]; do
-  DATA="$(${ANTICOL} 2>&1)"
-  FAILED=$(echo ${DATA}|grep -c "Error: No tag available")
-  if [ ${FAILED} -eq 0 ]; then
-   CARD_UID=$(echo "${DATA}"|grep "UID:"|awk '{print $2}')
-   CARD_ATQA=$(echo "${DATA}"|grep "ATQA:"|awk '{print $2}')
-   CARD_SAK=$(echo "${DATA}"|grep "SAK:"|awk '{print $2}')
-   if [ "${CARD_UID}" == "" -o "${CARD_ATQA}" == "" -o "${CARD_SAK}" == "" ]; then
+if [ -z "$RESTORE_CARD_FILE" ]; then
+    READ_CARD_LOOP=1
+    while [ ${READ_CARD_LOOP} -eq 1 ]; do
+     printf " %-55s" "Place the card to clone on the reader now.."
+     read_uid_success="FALSE"
+     while [ "${read_uid_success}" == "FALSE" ]; do
+      DATA="$(${ANTICOL} 2>&1)"
+      FAILED=$(echo ${DATA}|grep -c "Error: No tag available")
+      if [ ${FAILED} -eq 0 ]; then
+       CARD_UID=$(echo "${DATA}"|grep "UID:"|awk '{print $2}')
+       CARD_ATQA=$(echo "${DATA}"|grep "ATQA:"|awk '{print $2}')
+       CARD_SAK=$(echo "${DATA}"|grep "SAK:"|awk '{print $2}')
+       if [ "${CARD_UID}" == "" -o "${CARD_ATQA}" == "" -o "${CARD_SAK}" == "" ]; then
+        sleep 1
+       else
+        read_uid_success="SUCCESS"
+       fi
+      fi
+     done
+     echo "[OK]"
+     #
+     printf "\n ##### CARD DATA DUPLICATION IN PROGRESS ##### (this often takes up to 75 seconds)"
+     printf "\n %-55s" "$(date) Started  cloning of ID-Card with UID: ${CARD_UID} (ATQA:${CARD_ATQA}/SAK:${CARD_SAK}) "
+     ${MFOC} -O ${SAVE_CARD_DUMP_FILES_HERE:-.}/${CARD_UID}.${TIMESTAMP}.mfd > ${PROGRAM}.log 2>${PROGRAM}.error
+     if [ $? -ne 0 ]; then
+      printf "\n ##### CARD DATA DUPLICATION FAILED !!!! #####\n\n"
+      READ_CARD_LOOP=1
+     else
+      READ_CARD_LOOP=0
+      printf "\n %-55s" "$(date) Finished cloning of ID-Card with UID: ${CARD_UID} (ATQA:${CARD_ATQA}/SAK:${CARD_SAK}) "
+     fi
+    done # LOOP IF READ FAILED
+
+    #-------------------------------------------------
+    # WAIT FOR REPLACED CARD
+    #-------------------------------------------------
     sleep 1
-   else
-    read_uid_success="SUCCESS"
-   fi
-  fi
- done
- echo "[OK]"
- #
- printf "\n ##### CARD DATA DUPLICATION IN PROGRESS ##### (this often takes up to 75 seconds)"
- printf "\n %-55s" "$(date) Started  cloning of ID-Card with UID: ${CARD_UID} (ATQA:${CARD_ATQA}/SAK:${CARD_SAK}) "
- ${MFOC} -O ${SAVE_CARD_DUMP_FILES_HERE:-.}/${CARD_UID}.${TIMESTAMP}.mfd > ${PROGRAM}.log 2>${PROGRAM}.error
- if [ $? -ne 0 ]; then
-  printf "\n ##### CARD DATA DUPLICATION FAILED !!!! #####\n\n"
-  READ_CARD_LOOP=1
- else
-  READ_CARD_LOOP=0
-  printf "\n %-55s" "$(date) Finished cloning of ID-Card with UID: ${CARD_UID} (ATQA:${CARD_ATQA}/SAK:${CARD_SAK}) "
- fi
-done # LOOP IF READ FAILED
-#-------------------------------------------------
-# WAIT FOR REPLACED CARD
-#-------------------------------------------------
-sleep 1
-printf "\n\n %-55s" "Remove the original card.. "
-CARD_REMOVED=0
-while [ ${CARD_REMOVED} -eq 0 ]; do
- ${NFC_POLL} > /dev/null 2>&1
- if [ $? -eq 0 ]; then
-  CARD_REMOVED=1
- fi
-done
-echo "[OK]"
+    printf "\n\n %-55s" "Remove the original card.. "
+    CARD_REMOVED=0
+    while [ ${CARD_REMOVED} -eq 0 ]; do
+    ${NFC_POLL} > /dev/null 2>&1
+    if [ $? -eq 0 ]; then
+    CARD_REMOVED=1
+    fi
+    done
+    echo "[OK]"
+else
+    CARD_UID=$(echo $(basename ${RESTORE_CARD_FILE}) | cut -d. -f1)
+    TIMESTAMP=$(echo $(basename ${RESTORE_CARD_FILE}) | cut -d. -f2-)
+    echo "Getting info from filename: CARD_UID=$CARD_UID TIMESTAMP=$TIMESTAMP"
+fi
+
 #-------------------------------------------------
 # WAIT FOR REPLACED CARD
 #-------------------------------------------------
