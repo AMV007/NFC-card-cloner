@@ -150,7 +150,7 @@ if [ -z "$RESTORE_CARD_FILE" ]; then
 else
     CARD_UID=$(echo $(basename ${RESTORE_CARD_FILE}) | cut -d. -f1)
     TIMESTAMP=$(echo $(basename ${RESTORE_CARD_FILE}) | cut -d. -f2-)
-    echo "Getting info from filename: CARD_UID=$CARD_UID TIMESTAMP=$TIMESTAMP"
+    echo " Getting info from filename: CARD_UID=$CARD_UID TIMESTAMP=$TIMESTAMP"
 fi
 
 #-------------------------------------------------
